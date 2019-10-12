@@ -1,0 +1,153 @@
+module mojo_top (
+    input clk,              // 50MHz clock
+    input rst_n,            // reset button (active low)
+    output led [8],         // 8 user controllable LEDs
+    input cclk,             // configuration clock, AVR ready when high
+    output spi_miso,        // AVR SPI MISO
+    input spi_ss,           // AVR SPI Slave Select
+    input spi_mosi,         // AVR SPI MOSI
+    input spi_sck,          // AVR SPI Clock
+    output spi_channel [4], // AVR general purpose pins (used by default to select ADC channel)
+    input avr_tx,           // AVR TX (FPGA RX)
+    output avr_rx,          // AVR RX (FPGA TX)
+    input avr_rx_busy,      // AVR RX buffer full
+    output io_led [3][8],   // LEDs on IO Shield
+    output io_seg [8],      // 7-segment LEDs on IO Shield
+    output io_sel [4],      // Digit select on IO Shield
+    input io_button [5],    // 5 buttons on IO Shield
+    input io_dip [3][8],     // DIP switches on IO Shield
+    output a,                 // Inputs and outputs are defined here. Outputs: a, b, and cin. Inputs: sum and cout.
+    output b,                 // the corresponding pins are defined in the user constraints file custom.ucf
+    output cin,                //   
+    input sum,               // output should be assign in always
+    input cout  
+    ) {
+  
+  sig rst;                  // reset signal
+  
+  .clk(clk) {
+    // The reset conditioner is used to synchronize the reset signal to the FPGA
+    // clock. This ensures the entire FPGA comes out of reset at the same time.
+    reset_conditioner reset_cond;
+    .rst(rst){
+    fsm state={ONE, TWO,THR,FOU,FIV,SIX,SEV,EIG,PASS};
+      }
+  }
+  
+  always {
+    reset_cond.in = ~rst_n; // input raw inverted reset signal
+    rst = reset_cond.out;   // conditioned reset
+    
+    led = 8h00;             // turn LEDs off
+    spi_miso = bz;          // not using SPI
+    spi_channel = bzzzz;    // not using flags
+    avr_rx = bz;            // not using serial port
+    
+    io_led = 3x{{8h00}};    // turn LEDs off
+    io_seg = 8hff;          // turn segments off
+    io_sel = 4hf;           // select no digits
+    
+    //Part 1: Automatic testing
+    a=0;
+    b=0;
+    cin=0;
+    if(io_dip[0][7]){                     //we set the 7th dip(from right to count ) to control  the automatic testing start 
+    case(state.q){
+      state.ONE:                          // state ONE : a=0,b=0,c=0                                                                                                                                                                                                                                                                                                                                                                                                                  
+        a=1b0;
+        b=1b0;
+        cin= 1b0;
+        
+        if(sum ==0 && cout==0){           // Check if the outputs of the full-adder s, cout are correct. 
+                                          //If it is correct go to the next test case(state TWO), if not, STOP
+          state.d= state.TWO;
+          io_led[0][0]=1b1;              
+          }
+      state.TWO:                         // state TWO : a=0,b=0,c=1  
+          a=1b0;
+          b=1b0;
+          cin= 1b1;
+        if(sum ==1 && cout==0){          // Check if the outputs of the full-adder s, cout are correct. 
+                                         //If it is correct go to the next test case(state THR), if not, STOP
+        state.d = state.THR;
+          io_led[0][1]=1b1;              
+          }
+      state.THR:                         // state THR : a=0,b=1,c=0  
+        a=1b0;
+        b=1b1;
+        cin= 1b0;
+        
+        if(sum ==1 && cout==0){          // Check if the outputs of the full-adder s, cout are correct. 
+                                         //If it is correct go to the next test case(state FOU), if not, STOP 
+          state.d= state.FOU;
+          io_led[0][2]=1b1;
+          }
+       state.FOU:                        // state FOU : a=0,b=1,c=1  
+        a=1b0;
+        b=1b1;
+        cin= 1b1;
+        
+        if(sum ==0 && cout==1){          // Check if the outputs of the full-adder s, cout are correct. 
+                                         //If it is correct go to the next test case(state FIV), if not, STOP
+          state.d= state.FIV;
+          io_led[0][3]=1b1;              
+          } 
+       state.FIV:                        // state FIV : a=1,b=0,c=0  
+        a=1b1;
+        b=1b0;
+        cin= 1b0;
+        
+        if(sum ==1 && cout==0){           // Check if the outputs of the full-adder s, cout are correct. 
+                                          //If it is correct go to the next test case(state SIX), if not, STOP
+          state.d= state.SIX;
+          io_led[0][4]=1b1;
+          }
+        state.SIX:                        // state SIX : a=1,b=0,c=1  
+        a=1b1;
+        b=1b0;
+        cin= 1b1;
+        
+        if(sum ==0 && cout==1){           // Check if the outputs of the full-adder s, cout are correct. 
+                                          //If it is correct go to the next test case(state SEV), if not, STOP
+          state.d= state.SEV;
+          io_led[0][5]=1b1;
+          }
+          
+        state.SEV:                        // state SEV : a=1,b=1,c=0  
+        a=1b1;
+        b=1b1;
+        cin= 1b0;
+        
+        if(sum ==0 && cout==1){           // Check if the outputs of the full-adder s, cout are correct. 
+                                          //If it is correct go to the next test case(state EIG), if not, STOP.
+          state.d= state.EIG;
+          io_led[0][6]=1b1;
+          }
+          
+        state.EIG:                        // state EIG : a=1,b=1,c=1  
+        a=1b1;
+        b=1b1;
+        cin= 1b1;
+        
+        if(sum ==1 && cout==1){          // Check if the outputs of the full-adder s, cout are correct. 
+                                          //If it is correct go to the next test case( Pass state)
+          state.d= state.PASS;
+          io_led[0][7]=1b1;
+          } 
+
+        
+              
+      state.PASS:                       // The pass state indicates that the outputs of the full adder is correct.  
+        io_led[1]=8hff;                  // state PASS : ALL test cases (state one to state eight) passed  
+      }
+      
+    }
+      ////Part 2: Manual testing
+    else{                                //connect the value of a, b, cin to the right most three switches for manual testing
+      a= io_dip[0][0];                   // the 1st switch (count from right to left  )control a 
+      b=io_dip[1][0];                    // the 8th switch (from right to count )control b 
+      cin=io_dip[2]0];                   // the 17th switch (from right to count )control c 
+      }
+    
+  }
+}
